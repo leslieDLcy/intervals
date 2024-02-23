@@ -7,8 +7,13 @@ TODO: func `intervalise()` removes the ability to consume by the last axis;
 '''
 
 def initialise_interval_matrix(low, high):
-    """ initialise an interval matrix from the shape (2, m, n) """
-
+    """ initialise an interval matrix from `low, high` arrays;
+     
+    note:
+        from the shape (2, m, n)      
+    """
+    
+    # e.g.
     # low = np.arange(9).reshape(3,3)
     # high = np.arange(10, 19).reshape(3,3)
 
@@ -58,11 +63,32 @@ def rowcol2(x, W):
     return result[np.newaxis, :]
 
 
+def consume_list(list_intervals):
+    """ consume a list of interval matrices into a single interval matrix 
+    
+    note:
+        - being used for interval matrix multiplication
+    """
+
+    low, upper = [], []
+    for interval in list_intervals:
+        low.append(interval.lo)
+        upper.append(interval.hi)
+    
+    low_a = np.vstack(low)
+    upper_a = np.vstack(upper)
+
+    return intervalise(low_a, upper_a)
+
+
 def intvl_matmul(x, W):
     """ draft matrix multiplication function for interval matrices 
     
     note:   
         - can be used for general matrix multiplication
+
+    return: 
+        - an interval matrix
     """
 
     row_list = []
@@ -70,7 +96,7 @@ def intvl_matmul(x, W):
     if len(sx) > 1:
         for i in range(sx[0]):
             row_list.append(rowcol2(x[i], W))
-        return row_list
+        return consume_list(row_list)
     else:
         return rowcol2(x, W)
     
