@@ -3,22 +3,22 @@ from intervals.methods import (lo,hi,mid,rad,width,intervalise)
 
 ''' this file contains the functions to create interval matrices from numpy arrays 
 
-TODO: func `intervalise()` removes the ability to consume by the last axis;
+TODO: func `intervalise()` change the default setting to consume by the last axis to first axis or 2by2 matrix will be wrong;
 '''
 
-def initialise_interval_matrix(low, high):
+def consume_interval(low, high):
     """ initialise an interval matrix from `low, high` arrays;
      
     note:
-        from the shape (2, m, n)      
+        initialise from the shape (2, m, n) as preferred;
+
+    example:
+        low = np.arange(9).reshape(3,3)
+        high = np.arange(10, 19).reshape(3,3)
     """
     
-    # e.g.
-    # low = np.arange(9).reshape(3,3)
-    # high = np.arange(10, 19).reshape(3,3)
-
     a_matrix = np.stack([low, high], axis=0)
-    return intervalise(a_matrix)
+    return intervalise(a_matrix, index=0)
 
 
 def create_interval(matrix, half_width=0.1):
@@ -26,7 +26,7 @@ def create_interval(matrix, half_width=0.1):
 
     low = matrix * (1 - half_width)
     high = matrix * (1 + half_width)
-    return initialise_interval_matrix(low, high)
+    return consume_interval(low, high)
 
 
 def dot(x,y): return sum(x*y)
@@ -42,31 +42,48 @@ def rowcol(W,x):
     return intervalise(y)
 
 
-def rowcol2(x, W):
-    """ Leslie's implementation of the rowcol function 
+def rowcol2(x,W):
+    """ Leslie changed the argument order for notational convecience original implementation of the rowcol function 
     
     args:
-        - x: a vector, e.g. hidden layer output
-        - W: weight matrix of the next layer
-
-    note:
-        - this is not full-fleged interval matrix computation
-        - it currently only fits for `x` as a vector
-        - it can be used for hidden-layer tensor propagation
+        - W: have to be a vector;
     """
-
-    s = W.shape
+    
+    s = x.shape
     y=[]
-    for j in range(s[1]): 
-        y.append(dot(x, W[:, j]))
-        result = intervalise(y)
-    return result[np.newaxis, :]
+    for i in range(s[0]): 
+        y.append(dot(x[i],W))
+    return intervalise(y)
+
+
+
+# def rowcol_wrong(x, W):
+#     """ Leslie's implementation of the rowcol function 
+    
+#     args:
+#         - x: a vector, e.g. hidden layer output, as a row vector
+#         - W: weight matrix of the next layer
+
+#     note:
+#         - this is not full-fleged interval matrix computation
+#         - it currently only fits for `x` as a vector
+#         - it can be used for hidden-layer tensor propagation
+#     """
+
+#     s = W.shape
+#     y=[]
+#     for j in range(s[1]): 
+#         y.append(dot(x, W[:, j]))
+#         result = intervalise(y)
+#     return result[np.newaxis, :]
 
 
 def consume_list(list_intervals):
     """ consume a list of interval matrices into a single interval matrix 
     
+    ! of no use now
     note:
+
         - being used for interval matrix multiplication
     """
 
@@ -91,12 +108,12 @@ def intvl_matmul(x, W):
         - an interval matrix
     """
 
-    row_list = []
-    sx = x.shape
-    if len(sx) > 1:
-        for i in range(sx[0]):
-            row_list.append(rowcol2(x[i], W))
-        return consume_list(row_list)
+    row_cp_list = []
+    sW = W.shape
+    if (len(sW)) > 1 & (sW[1]>1):
+        for j in range(sW[1]):
+            row_cp_list.append(rowcol2(x, W[:, j]))
+        return intervalise(row_cp_list)
     else:
         return rowcol2(x, W)
     
