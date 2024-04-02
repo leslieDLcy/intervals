@@ -50,10 +50,14 @@ def rowcol2(x,W):
     """
     
     s = x.shape
-    y=[]
-    for i in range(s[0]): 
-        y.append(dot(x[i],W))
-    return intervalise(y)
+    if len(s) > 1:
+        y=[]
+        for i in range(s[0]): 
+            y.append(dot(x[i],W))
+            
+        return intervalise(y)
+    else:
+        print('x shall be a 2 dimensional array')
 
 
 
@@ -110,10 +114,15 @@ def intvl_matmul(x, W):
 
     row_cp_list = []
     sW = W.shape
-    if (len(sW)) > 1 & (sW[1]>1):
-        for j in range(sW[1]):
-            row_cp_list.append(rowcol2(x, W[:, j]))
-        return intervalise(row_cp_list)
+    if (len(sW)) > 1:
+        if (sW[1]>1):
+            for j in range(sW[1]):
+                row_cp_list.append(rowcol2(x, W[:, j]))
+            return intervalise(row_cp_list)
+        elif sW[1]==1:
+            return rowcol2(x, W[:, 0])
+        else: 
+            return rowcol2(x, W)
     else:
         return rowcol2(x, W)
     
