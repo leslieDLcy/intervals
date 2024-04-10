@@ -18,7 +18,7 @@ def consume_interval(low, high):
     """
     
     a_matrix = np.stack([low, high], axis=0)
-    return intervalise(a_matrix, index=0)
+    return intervalise(a_matrix)
 
 
 def create_interval(matrix, half_width=0.1):

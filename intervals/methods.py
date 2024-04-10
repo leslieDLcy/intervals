@@ -30,7 +30,7 @@ from typing import (Sequence, Sized, Iterable, Optional, Any, Tuple, Union)
 from itertools import product
 
 import numpy
-from numpy import (ndarray,asarray,transpose,vstack,linspace,zeros,argmax)
+from numpy import (ndarray,asarray,vstack,linspace,zeros,argmax)
 
 from intervals.number import (Interval, MACHINE_EPS)
 
@@ -46,6 +46,7 @@ numpy_tan = numpy.tan
 # numpy_cot = numpy.cotang
 numpy_pi  = numpy.pi
 numpy_inf = numpy.Inf
+numpy_transpose = numpy.transpose
 
 # Properties or maybe attributes of the interval class. These apply to all interval-like objects.
 
@@ -485,7 +486,7 @@ def intersect_vector(x_:Interval,y_:Interval):
 # parser.py
 #####################################################################################
 # Universal parser
-def intervalise(x_: Any, index = -1) -> Union[Interval,Any]:
+def intervalise(x_: Any, interval_index = -1) -> Union[Interval,Any]:
     """
     This function casts an array-like structure into an Interval structure. 
     All array-like structures will be first coerced into an ndarray of floats.
@@ -500,7 +501,7 @@ def intervalise(x_: Any, index = -1) -> Union[Interval,Any]:
 
     (*) an ndarray of shape (2,3,7) will be cast as an Interval of shape (3,7).
 
-    (*) an ndarray of shape (2,3,7,2) will be cast as an Interval of shape (2,3,7).
+    (*) an ndarray of shape (2,3,7,2) will be cast as an Interval of shape (2,3,7) if interval_index is set to -1.
 
     If an ndarray has shape with multiple dimensions having size 2, then the last dimension is intervalised.
     So, an ndarray of shape (7,2,2) will be cast as an Interval of shape (7,2) with the last dimension intervalised. 
@@ -534,15 +535,18 @@ def intervalise(x_: Any, index = -1) -> Union[Interval,Any]:
         if x_.__class__.__name__=='list': return treat_list(x_) # attempt to turn a n-list of intervals into a (n,...)-interval 
     s = x.shape
     two=[si==2 for si in s]
-    if all(two): return Interval(lo=transpose(x)[0],hi=transpose(x)[1])
+    # if all(two): return Interval(lo=numpy_transpose(x)[0],hi=numpy_transpose(x)[1])
+    if all(two): return Interval(lo=x[...,0],hi=x[...,1])
     elif any(two):
-        if two[-1]: return Interval(lo=transpose(x)[0],hi=transpose(x)[1]) # the last dimension has size 2
-        elif two[0]: return Interval(lo=x[0],hi=x[1])
+        # if two[-1]: return Interval(lo=numpy_transpose(x)[0],hi=numpy_transpose(x)[1]) # the last dimension has size 2
+        if two[-1]: return Interval(lo=x[...,0],hi=x[...,1]) # last dimension has size 2
+        elif two[0]: return Interval(lo=x[0],hi=x[1]) # first dimension has size 2
         elif (two[-1]) & (two[0]): # this is the ambiguous case (2,3,5,2)
-            if index == 0: return Interval(lo=x[0],hi=x[1]) # first dimension gets intervalised
-            elif index == -1: return Interval(lo=transpose(x)[0],hi=transpose(x)[1])
+            if interval_index == 0: return Interval(lo=x[0],hi=x[1]) # first dimension gets intervalised
+            # elif index == -1: return Interval(lo=numpy_transpose(x)[0],hi=numpy_transpose(x)[1])
+            elif interval_index == -1: return Interval(lo=x[...,0],hi=x[...,1])
             # if (sum(two)==1) & (two[0]): return Interval(lo=x[0],hi=x[1])# there is only one dimension of size 2 and is the first one
-        print('Array-like structure must have last dimension (or first) of size 2, for it to be coerced to Interval.')
+        print('Array-like structure must have the last (or first) dimension of size 2, for it to be coerced to Interval.')
         return Interval(lo=x) 
     else: return Interval(lo=x)
 
@@ -645,3 +649,165 @@ def bisect(x_:Interval,i:int=None):
 # Interval to bool methods, Unary.
 def is_Interval(x:Any) -> bool: return x.__class__.__name__ == 'Interval'
 def is_not_Interval(x:Any) -> bool: return x.__class__.__name__ != 'Interval' 
+
+#####################################################################################
+################################# neural_networks.py ################################
+#####################################################################################
+def dot(x:Interval,y:Interval): return sum(x*y)
+def rowcol_old(W,x):
+    '''
+    (m,n) x (n,1) -> (m,1)
+    (m,n) x (n,p) -> (m,p)
+    (1,n) x (n,1) -> (1,1)
+    '''
+    s = W.shape
+    x_shape = x.shape
+    if x_shape[0]==1: # x is row and must be either squeezed or transposed
+        x_ = x[0,:]
+    if x_shape[1]==1: # this is the correct shape
+        x_ = x[:,0]
+    if len(x_shape)==1: # x can be row or column (n,)
+        x_ = x
+    y=[]
+    for i in range(s[0]): 
+        y.append(dot(W[i],x_))
+    return intervalise(y)
+
+def rowcol_W_x(W,x): 
+    '''
+    Row by column multiplication between a matrix W and a column vector x.
+
+    (m,n) x (n,1) -> (m,1)
+    (1,n) x (n,1) -> (1,1)
+    The following cases are also accepted even though mathematically impossible
+    (m,n) x (n,) -> (m,1)
+    (1,n) x (n,1) -> (1,1)
+    (1,n) x (1,n) -> (1,1) 
+    '''
+    m,n = W.shape
+    x_shape = x.shape
+    if not((n==x_shape[0]) | (n==x_shape[1])): 
+        raise ValueError(f'Incompatible shapes ({m},{n}) x ({x_shape[0]},1) -> (?,?). Inner sizes must be same, {x_shape[1]} is different from {n}.')
+    if x_shape[0]==1: # x is row and must be either squeezed or transposed
+        x_ = x[0,:]
+    if x_shape[1]==1: # this is the correct shape
+        x_ = x[:,0]
+    if len(x_shape)==1: # x can be row or column (n,)
+        x_ = x
+    y=numpy.empty((m,2))
+    for i in range(m): 
+        inner_product = dot(W[i],x_)
+        y[i,0] = inner_product.lo
+        y[i,1] = inner_product.hi
+    ylo = numpy.expand_dims(y[...,0],axis=1)
+    yhi = numpy.expand_dims(y[...,1],axis=1)
+    return Interval(ylo,yhi)
+
+def rowcol_xT_WT(x,W): 
+    '''
+    Row by column multiplication between the row vector xT and the matrix transpose WT.
+    (1,n) x (n,m) -> (1,m)
+    (1,n) x (n,1) -> (1,1)
+    The following cases are also accepted even though mathematically impossible
+    (,n) x (n,m) -> (1,m)
+    (n,1) x (n,m) -> (1,1)
+    '''
+    n,m = W.shape
+    x_shape = x.shape
+    if not((n==x_shape[0]) | (n==x_shape[1])): 
+        raise ValueError(f'Incompatible shapes (1,{x_shape[1]}) x ({n},{m}) -> (?,?). Inner sizes must be same, {x_shape[1]} is different from {n}.')
+    if x_shape[0]==1: # this is the correct shape
+        x_ = x[0,:]
+    if x_shape[1]==1: # x is row and must be either squeezed or transposed
+        x_ = x[:,0]
+    if len(x_shape)==1: # x can be row or column (n,)
+        x_ = x
+    y=numpy.empty((m,2))
+    for i in range(m): 
+        inner_product = dot(x_,W[...,i])
+        y[i,0] = inner_product.lo
+        y[i,1] = inner_product.hi
+    ylo = numpy.expand_dims(y[...,0],axis=0)
+    yhi = numpy.expand_dims(y[...,1],axis=0)
+    return Interval(ylo,yhi)
+
+def matmul(A,B):
+    '''
+    (m,n) x (n,p) -> (m,p) 
+    (1,n) x (n,1) -> (1,1)
+    '''
+    m,na = A.shape
+    nb,p = B.shape
+    if na!=nb: raise ValueError(f'Incompatible shapes ({m},{na}) x ({nb},{p}) -> (?,?). Inner sizes must be same, {na} is different from {nb}.')
+    C = numpy.empty((m,p,2))
+    for i in range(m):
+        for j in range(p):
+            inner_product = dot(A[i],B[...,j])
+            C[i,j,0] = inner_product.lo
+            C[i,j,1] = inner_product.hi
+    return intervalise(C)
+
+def transpose(x:Interval): # not efficient it creates a new object in memory
+    '''
+    Input an interval of shape (m,n) returns an interval of shape (n,m).
+    '''
+    return Interval(x.val[...,0], x.val[...,1])
+
+def squeeze(x:Interval): # not efficient it creates a new object in memory
+    return Interval(numpy.squeeze(x.lo),numpy.squeeze(x.hi))
+
+################################ activation_functions.py #############################
+
+def relu_nointerval(x:ndarray):
+    positive = x>0
+    output = numpy.zeros(x.shape)
+    output[positive]=x[positive]
+    return output
+
+def relu_deriv(x:ndarray):
+    positive = x>0
+    output = numpy.zeros(x.shape)
+    output[positive]=1
+    return output
+
+def relu(x:Interval):
+    if is_not_Interval(x): return relu_nointerval(x)
+    case_1 = x.hi<0
+    x_lo = x.val[...,0].T
+    x_hi = x.val[...,1].T
+    x_lo[case_1] = 0
+    x_hi[case_1] = 0
+    case_3 = (x_lo<0) & (numpy.logical_not(case_1))
+    x_lo[case_3] = 0
+    relu_x = Interval(lo=x_lo, hi=x_hi)
+    return relu_x
+
+def relu_deriv_interval(x:Interval):
+    if is_not_Interval(x): return relu_deriv(x)
+    x_lo = x.val[...,0].T
+    x_hi = x.val[...,1].T
+    case_1 = x_hi<0
+    d_lo = numpy.zeros(x_lo.shape)
+    d_hi = numpy.ones(x_hi.shape)
+    d_hi[case_1] = 0
+    # case_3 = (x_lo<0) & (np.logical_not(case_1))
+    case_2 = x_lo>0
+    d_lo[case_2] = 1
+    d_relu_x = Interval(lo=d_lo, hi=d_hi)
+    return d_relu_x
+
+def sigmoid(x): return 1/(1+exp(-x))
+def sigmoid_deriv(x): return sigmoid(x)*(1-sigmoid(x))
+
+# def tanh_(x): return np.tanh(x)
+def tanh(x:Interval): return (exp(2*x)-1)/(exp(2*x)+1)
+def tanh(x:Interval): 
+    r = -1
+    s = 1
+    u = 1
+    t = 1
+    return s/u - (s*t/u**2 - r/u)/(t/u + exp(2*x))
+# def cot(x): return 1/np.tan(x)
+# def tanh(x): return -(1/(cot(np.arctan(x)/2)**2))
+def cosh(x:Interval): return (1+exp(-2*x))/(2*exp(-x))
+def tanh_deriv(x:Interval): return (1/cosh(x))**2
