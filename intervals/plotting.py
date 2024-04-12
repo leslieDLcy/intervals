@@ -36,6 +36,7 @@ def plot_intervals(x, y_i, **kwargs):
     return ax
 
 
+
 def plot_lower_bound(x, y_i, **kwargs):
     """ plot lower bound of intervals 
     

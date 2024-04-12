@@ -24,8 +24,8 @@ def consume_interval(low, high):
 def create_interval(matrix, half_width=0.1):
     """ mannually create an interval matrix from a numpy array """
 
-    low = matrix * (1 - half_width)
-    high = matrix * (1 + half_width)
+    low = matrix - half_width
+    high = matrix + half_width
     return consume_interval(low, high)
 
 
