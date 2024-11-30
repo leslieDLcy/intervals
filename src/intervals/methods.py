@@ -45,7 +45,7 @@ numpy_cos = numpy.cos
 numpy_tan = numpy.tan
 # numpy_cot = numpy.cotang
 numpy_pi = numpy.pi
-numpy_inf = numpy.Inf
+numpy_inf = numpy.inf
 numpy_transpose = numpy.transpose
 
 # Properties or maybe attributes of the interval class. These apply to all interval-like objects.
@@ -810,8 +810,8 @@ def rowcol_W_x(W, x):
     m, n = W.shape
     x_shape = x.shape
     if not ((n == x_shape[0]) | (n == x_shape[1])):
-        raise ValueError(f'Incompatible shapes({m}, {n}) x({x_shape[0]}, 1) -> (?, ?).
-                         Inner sizes must be same, {x_shape[1]} is different from {n}.')
+        raise ValueError(
+            f"Incompatible shapes [{m}, {n}] x({x_shape[0]}, 1) -> (?, ?). Inner sizes must be same, {x_shape[1]} is different from {n}.")
     if x_shape[0] == 1:  # x is row and must be either squeezed or transposed
         x_ = x[0, :]
     if x_shape[1] == 1:  # this is the correct shape
@@ -840,8 +840,8 @@ def rowcol_xT_WT(x, W):
     n, m = W.shape
     x_shape = x.shape
     if not ((n == x_shape[0]) | (n == x_shape[1])):
-        raise ValueError(f'Incompatible shapes(1, {x_shape[1]}) x({n}, {
-                         m}) -> (?, ?). Inner sizes must be same, {x_shape[1]} is different from {n}.')
+        raise ValueError(
+            f"Incompatible shapes(1, {x_shape[1]}) x({n}, {m}) -> (?, ?). Inner sizes must be same, {x_shape[1]} is different from {n}.")
     if x_shape[0] == 1:  # this is the correct shape
         x_ = x[0, :]
     if x_shape[1] == 1:  # x is row and must be either squeezed or transposed
@@ -866,8 +866,8 @@ def matmul(A, B):
     m, na = A.shape
     nb, p = B.shape
     if na != nb:
-        raise ValueError(f'Incompatible shapes({m}, {na}) x({nb}, {
-                         p}) -> (?, ?). Inner sizes must be same, {na} is different from {nb}.')
+        raise ValueError(
+            f"Incompatible shapes({m}, {na}) x({nb}, {p}) -> (?, ?). Inner sizes must be same, {na} is different from {nb}.")
     C = numpy.empty((m, p, 2))
     for i in range(m):
         for j in range(p):
